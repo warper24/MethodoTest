@@ -1,9 +1,10 @@
 import pytest
 import sys, os
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 from task_manager import (
-    create_task, get_task, update_task, change_task_status, delete_task,
-    get_tasks, search_tasks, task_list
+    update_task, change_task_status, delete_task,
+    get_tasks, get_task, task_list
 )
 
 # ------------------ US004 - Changer le statut d'une tâche ------------------
@@ -11,7 +12,13 @@ from task_manager import (
 class TestTaskStatus:
     def setup_method(self):
         task_list.clear()
-        create_task("Tâche à faire")
+        task_list.append({
+            "id": 1,
+            "title": "Tâche à faire",
+            "description": "",
+            "status": "TODO",
+            "created_at": "2024-07-01T10:00:00"
+        })
 
     def test_change_status_valid(self):
         for status in ["TODO", "ONGOING", "DONE"]:
@@ -34,7 +41,13 @@ class TestTaskStatus:
 class TestTaskDelete:
     def setup_method(self):
         task_list.clear()
-        create_task("A supprimer")
+        task_list.append({
+            "id": 1,
+            "title": "A supprimer",
+            "description": "",
+            "status": "TODO",
+            "created_at": "2024-07-01T10:00:00"
+        })
 
     def test_delete_existing_task(self):
         delete_task(1)
@@ -42,7 +55,6 @@ class TestTaskDelete:
 
     def test_delete_then_access(self):
         delete_task(1)
-        # Consulter, supprimer, modifier, changer status => Task not found
         with pytest.raises(ValueError):
             get_task(1)
         with pytest.raises(ValueError):
@@ -57,8 +69,15 @@ class TestTaskDelete:
 class TestTaskPagination:
     def setup_method(self):
         task_list.clear()
+        # Création brute de 25 tâches
         for i in range(25):
-            create_task(f"Tâche {i+1}")
+            task_list.append({
+                "id": i + 1,
+                "title": f"Tâche {i+1}",
+                "description": "",
+                "status": "TODO",
+                "created_at": f"2024-07-{(i // 10)+1:02d}T10:{i%60:02d}:00"
+            })
 
     def test_first_page_size_10(self):
         page = 1

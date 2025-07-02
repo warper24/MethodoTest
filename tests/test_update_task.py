@@ -3,12 +3,18 @@ from datetime import datetime
 import sys, os
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
-from task_manager import create_task, update_task, get_task, task_list
+from task_manager import update_task, get_task, task_list
 
 class TestUpdateTask:
     def setup_method(self):
         task_list.clear()
-        create_task("Titre", "Desc")
+        task_list.append({
+            "id": 1,
+            "title": "Titre",
+            "description": "Desc",
+            "status": "TODO",
+            "created_at": datetime.now().isoformat(timespec="seconds")
+        })
 
     def test_update_title_only(self):
         update_task(1, title="Nouveau titre")

@@ -3,14 +3,11 @@ from datetime import datetime
 import sys
 import os
 
-# Permet l'import depuis src
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
-
 from task_manager import get_task, task_list
 
 class TestGetTask:
     def setup_method(self):
-        """Réinitialise la liste avant chaque test et ajoute une tâche d'exemple."""
         task_list.clear()
         task_list.append({
             "id": 1,
@@ -28,7 +25,6 @@ class TestGetTask:
         assert "description" in task
         assert "status" in task
         assert "created_at" in task
-        # Vérifie le format ISO de created_at
         dt = datetime.fromisoformat(task["created_at"])
         assert isinstance(dt, datetime)
 

@@ -1,13 +1,19 @@
 import pytest
 import sys, os
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
-from task_manager import create_task, delete_task, get_task, update_task, change_task_status, task_list
+from task_manager import delete_task, get_task, update_task, change_task_status, task_list
 
 class TestDeleteTask:
     def setup_method(self):
         task_list.clear()
-        task_list.extend([])
-        create_task("A")
+        task_list.append({
+            "id": 1,
+            "title": "A",
+            "description": "Desc",
+            "status": "TODO",
+            "created_at": "2024-07-01T10:00:00"
+        })
 
     def test_delete_existing_task(self):
         delete_task(1)
