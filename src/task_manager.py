@@ -37,6 +37,15 @@ def _load_users():
 # On charge task_list UNE FOIS au lancement, puis on NE MODIFIE PLUS JAMAIS LE FICHIER
 task_list: List[Dict] = _load_tasks()
 
+#def _save_tasks(tasks_to_save: List[Dict]):
+#    """Sauvegarde la liste courante des tâches dans le fichier JSON."""
+#    try:
+#        with open(DATA_FILE, 'w', encoding='utf-8') as f:
+#            json.dump(tasks_to_save, f, ensure_ascii=False, indent=2)
+#    except IOError:
+#        pass
+
+
 # US002/US003/US016 - Tri des tâches (statut, date, titre, priorité)
 def sort_tasks(tasks, sort_by="created_at", order="desc"):
     valid_sort = {"created_at", "title", "status", "priority"}
