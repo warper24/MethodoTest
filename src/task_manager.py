@@ -36,7 +36,7 @@ def _load_users():
 task_list: List[Dict] = _load_tasks()
 
 def sort_tasks(tasks, sort_by="created_at", order="desc"):
-    valid_sort = {"created_at", "title", "status"}
+    valid_sort = {"created_at", "title", "status", "priority"}
     valid_order = {"asc", "desc"}
     if sort_by not in valid_sort:
         raise ValueError("Invalid sort criteria")
@@ -48,13 +48,17 @@ def sort_tasks(tasks, sort_by="created_at", order="desc"):
     if sort_by == "status":
         # Ordre logique TODO < ONGOING < DONE
         status_order = {"TODO": 0, "ONGOING": 1, "DONE": 2}
-        return sorted(tasks, key=lambda t: status_order.get(t["status"], 99))
+        return sorted(tasks, key=lambda t: status_order.get(t.get("status"), 99), reverse=reverse)
     elif sort_by == "created_at":
-        return sorted(tasks, key=lambda t: t["created_at"], reverse=reverse)
+        return sorted(tasks, key=lambda t: t.get("created_at", ""), reverse=reverse)
     elif sort_by == "title":
-        return sorted(tasks, key=lambda t: t["title"].lower(), reverse=reverse)
+        return sorted(tasks, key=lambda t: t.get("title", "").lower(), reverse=reverse)
+    elif sort_by == "priority":
+        priority_order = {"CRITICAL": 0, "HIGH": 1, "NORMAL": 2, "LOW": 3}
+        return sorted(tasks, key=lambda t: priority_order.get(t.get("priority", "NORMAL"), 99), reverse=reverse)
     else:
         raise ValueError("Invalid sort criteria")
+
 
 def get_tasks(
     page=1,
@@ -63,22 +67,25 @@ def get_tasks(
     sort_by="created_at",
     order="desc",
     keyword=None,
-    status=None
+    status=None,
+    priority=None
 ):
     """
     Récupère la liste des tâches en appliquant optionnellement :
     - un filtre sur le statut
     - une recherche par mot-clé (titre ou description)
-    - un tri (created_at, title, status)
+    - un tri (created_at, title, status, priority)
+    - un filtre par priorité
     - une pagination
 
     :param page: Numéro de page (dès 1)
     :param page_size: Taille de la page (>0)
     :param return_pagination: Si True, retourne aussi les infos de pagination
-    :param sort_by: Critère de tri ('created_at', 'title', 'status')
+    :param sort_by: Critère de tri ('created_at', 'title', 'status', 'priority')
     :param order: Sens du tri ('asc', 'desc')
     :param keyword: Mot-clé de recherche (titre ou description, insensible à la casse)
     :param status: Statut à filtrer ('TODO', 'ONGOING', 'DONE')
+    :param priority: Priorité à filtrer ('LOW', 'NORMAL', 'HIGH', 'CRITICAL')
     """
     if page_size <= 0:
         raise ValueError("Invalid page size")
@@ -90,7 +97,15 @@ def get_tasks(
         allowed_status = {"TODO", "ONGOING", "DONE"}
         if status not in allowed_status:
             raise ValueError("Invalid filter status")
-        tasks = [t for t in tasks if t["status"] == status]
+        tasks = [t for t in tasks if t.get("status") == status]
+
+    # Filtrage par priorité
+    if priority is not None:
+        allowed_prio = {"LOW", "NORMAL", "HIGH", "CRITICAL"}
+        prio = priority.upper()
+        if prio not in allowed_prio:
+            raise ValueError("Invalid priority. Allowed values: LOW, NORMAL, HIGH, CRITICAL")
+        tasks = [t for t in tasks if t.get("priority", "NORMAL") == prio]
 
     # Recherche par mot-clé
     if keyword is not None and keyword != "":
@@ -100,7 +115,7 @@ def get_tasks(
             if kw in t.get("title", "").lower() or kw in t.get("description", "").lower()
         ]
 
-    # Tri
+    # Tri (accepte 'priority' en plus des autres)
     tasks = sort_tasks(tasks, sort_by=sort_by, order=order)
 
     # Pagination
@@ -121,7 +136,7 @@ def get_tasks(
     else:
         return paged_tasks
 
-def create_task(title: str, description: str = "") -> Dict:
+def create_task(title: str, description: str = "", due_date: str = None, priority: str = "NORMAL") -> Dict:
     title_stripped = title.strip()
     if not title_stripped:
         raise ValueError("Title is required")
@@ -129,18 +144,30 @@ def create_task(title: str, description: str = "") -> Dict:
         raise ValueError("Title cannot exceed 100 characters")
     if len(description) > 500:
         raise ValueError("Description cannot exceed 500 characters")
-
+    allowed_priorities = {"LOW", "NORMAL", "HIGH", "CRITICAL"}
+    prio = (priority or "NORMAL").upper()
+    if prio not in allowed_priorities:
+        raise ValueError("Invalid priority. Allowed values: LOW, NORMAL, HIGH, CRITICAL")
+    # Gestion de due_date (échéance)
+    if due_date is not None:
+        try:
+            due_dt = datetime.fromisoformat(due_date)
+        except Exception:
+            raise ValueError("Invalid date format")
+        due_date = due_dt.isoformat(timespec='seconds')
     new_id = max((task["id"] for task in task_list), default=0) + 1
-
     new_task = {
         "id": new_id,
         "title": title_stripped,
         "description": description,
         "status": "TODO",
-        "created_at": datetime.now().isoformat(timespec="seconds")
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "due_date": due_date,
+        "priority": prio
     }
     task_list.append(new_task)
     return new_task
+
 
 def get_task(task_id: Union[int, str]) -> Dict:
     try:
@@ -388,3 +415,115 @@ def get_tasks_by_user(
         return paged_tasks, pagination
     else:
         return paged_tasks
+    
+def set_due_date(task_id, due_date):
+    try:
+        tid = int(task_id)
+    except (TypeError, ValueError):
+        raise ValueError("Invalid ID format")
+    for task in task_list:
+        if task.get("id") == tid:
+            if due_date is None:
+                task["due_date"] = None
+                return task
+            try:
+                from datetime import datetime
+                due_dt = datetime.fromisoformat(due_date)
+            except Exception:
+                raise ValueError("Invalid date format")
+            task["due_date"] = due_dt.isoformat(timespec='seconds')
+            if due_dt < datetime.now():
+                print("Warning: Due date is in the past")
+            return task
+    raise ValueError("Task not found")
+
+def set_task_priority(task_id, priority):
+    allowed = {"LOW", "NORMAL", "HIGH", "CRITICAL"}
+    prio = (priority or "NORMAL").upper()
+    if prio not in allowed:
+        raise ValueError("Invalid priority. Allowed values: LOW, NORMAL, HIGH, CRITICAL")
+    try:
+        tid = int(task_id)
+    except (TypeError, ValueError):
+        raise ValueError("Invalid ID format")
+    for task in task_list:
+        if task.get("id") == tid:
+            task["priority"] = prio
+            return task
+    raise ValueError("Task not found")
+
+def is_overdue(task):
+    """
+    Retourne True si la tâche est en retard :
+    - due_date est une chaîne 'YYYY-MM-DD' ou 'YYYY-MM-DDTHH:MM:SS'
+    - on compare uniquement la DATE d'échéance et la DATE du jour courant
+    - on marque en retard seulement si today > due_date
+    - uniquement pour les statuts TODO ou ONGOING
+    """
+    from datetime import datetime
+
+    due_str = task.get("due_date")
+    if not due_str:
+        return False
+
+    try:
+        # Si format complet avec 'T', on parse en datetime puis on prend la date
+        if "T" in due_str:
+            due_date = datetime.fromisoformat(due_str).date()
+        else:
+            due_date = datetime.strptime(due_str, "%Y-%m-%d").date()
+    except Exception:
+        # en cas de format invalide, on considère que ce n'est pas en retard
+        return False
+
+    today = datetime.now().date()
+    if today > due_date and task.get("status") in ("TODO", "ONGOING"):
+        return True
+    return False
+
+def get_overdue_tasks():
+    """
+    Renvoie la liste des tâches en retard selon is_overdue().
+    """
+    return [t for t in task_list if is_overdue(t)]
+
+
+def add_tag(task_id, tag):
+    tag = tag.strip()
+    if not tag or len(tag) > 20:
+        raise ValueError("Invalid tag validation")
+    for task in task_list:
+        if task.get("id") == int(task_id):
+            tags = set(task.get("tags", []))
+            tags.add(tag)
+            task["tags"] = list(tags)
+            return task
+    raise ValueError("Task not found")
+
+def add_tags(task_id, tags_list):
+    for tag in tags_list:
+        add_tag(task_id, tag)
+    return get_task(task_id)
+
+def remove_tag(task_id, tag):
+    for task in task_list:
+        if task.get("id") == int(task_id):
+            tags = set(task.get("tags", []))
+            tags.discard(tag)
+            task["tags"] = list(tags)
+            return task
+    raise ValueError("Task not found")
+
+def get_tasks_by_tag(tag):
+    return [t for t in task_list if tag in t.get("tags", [])]
+
+def get_tasks_by_tags(tags):
+    tags_set = set(tags)
+    return [t for t in task_list if tags_set.intersection(set(t.get("tags", [])))]
+
+def get_all_tags():
+    tags = {}
+    for t in task_list:
+        for tag in t.get("tags", []):
+            tags[tag] = tags.get(tag, 0) + 1
+    return tags
