@@ -319,3 +319,72 @@ def get_users(page=1, page_size=20, return_pagination=False):
         return paged_users, pagination
     else:
         return paged_users
+
+def get_tasks_by_user(
+    user_id=None,
+    page=1,
+    page_size=20,
+    status=None,
+    keyword=None,
+    sort_by="created_at",
+    order="desc",
+    return_pagination=False
+):
+    """
+    Retourne les tâches filtrées par assignation à un utilisateur donné (ou non assignées).
+    - user_id : int, id de l'utilisateur ou None pour tâches non assignées
+    - Les autres paramètres sont comme get_tasks
+    """
+    # Vérification de l'utilisateur si l'ID n'est pas None
+    if user_id is not None:
+        try:
+            uid = int(user_id)
+        except (TypeError, ValueError):
+            raise ValueError("Invalid user ID format")
+        users = _load_users()
+        if not any(u.get("id") == uid for u in users):
+            raise ValueError("User not found")
+    else:
+        uid = None
+
+    # Filtrage par assigné
+    def assigned_filter(t):
+        if uid is None:
+            return t.get("assignee_id") is None
+        else:
+            return t.get("assignee_id") == uid
+
+    tasks = [t for t in task_list if assigned_filter(t)]
+
+    # Appliquer autres filtres (statut, mot-clé)
+    if status is not None:
+        allowed_status = {"TODO", "ONGOING", "DONE"}
+        if status not in allowed_status:
+            raise ValueError("Invalid filter status")
+        tasks = [t for t in tasks if t["status"] == status]
+
+    if keyword is not None and keyword != "":
+        kw = keyword.lower()
+        tasks = [
+            t for t in tasks
+            if kw in t.get("title", "").lower() or kw in t.get("description", "").lower()
+        ]
+
+    # Tri et pagination
+    tasks = sort_tasks(tasks, sort_by=sort_by, order=order)
+    total_items = len(tasks)
+    total_pages = (total_items + page_size - 1) // page_size if total_items else 0
+    start = (page - 1) * page_size
+    end = start + page_size
+    paged_tasks = tasks[start:end]
+
+    if return_pagination:
+        pagination = {
+            "current_page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "total_items": total_items
+        }
+        return paged_tasks, pagination
+    else:
+        return paged_tasks
