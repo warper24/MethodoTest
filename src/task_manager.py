@@ -6,6 +6,7 @@ import re
 
 DATA_FILE = "tasks.json"
 
+# US001 - Chargement initial des tâches (fallback si JSON corrompu)
 def _load_tasks():
     """Charge une seule fois les tâches depuis le fichier JSON, ne jamais écrire dans ce fichier."""
     if os.path.exists(DATA_FILE):
@@ -22,6 +23,7 @@ def _load_tasks():
 
 USERS_FILE = "users.json"
 
+# US001 - Chargement initial des utilisateurs (fallback vide)
 def _load_users():
     if os.path.exists(USERS_FILE):
         try:
@@ -35,6 +37,7 @@ def _load_users():
 # On charge task_list UNE FOIS au lancement, puis on NE MODIFIE PLUS JAMAIS LE FICHIER
 task_list: List[Dict] = _load_tasks()
 
+# US002/US003/US016 - Tri des tâches (statut, date, titre, priorité)
 def sort_tasks(tasks, sort_by="created_at", order="desc"):
     valid_sort = {"created_at", "title", "status", "priority"}
     valid_order = {"asc", "desc"}
@@ -59,7 +62,9 @@ def sort_tasks(tasks, sort_by="created_at", order="desc"):
     else:
         raise ValueError("Invalid sort criteria")
 
-
+# US001/US002/US003/US016 - Listing et pagination des tâches
+# avec filtres par statut, mot-clé, priorité et tri
+# US002 pagination, US003 recherche par mot-clé, US016 priorité
 def get_tasks(
     page=1,
     page_size=20,
@@ -136,6 +141,8 @@ def get_tasks(
     else:
         return paged_tasks
 
+# US014/US016/US017 - Création de tâche avec titre, description, échéance, priorité et tags initiaux
+
 def create_task(title: str, description: str = "", due_date: str = None, priority: str = "NORMAL") -> Dict:
     title_stripped = title.strip()
     if not title_stripped:
@@ -168,7 +175,7 @@ def create_task(title: str, description: str = "", due_date: str = None, priorit
     task_list.append(new_task)
     return new_task
 
-
+# US005 - Récupération d'une tâche par ID
 def get_task(task_id: Union[int, str]) -> Dict:
     try:
         tid = int(task_id)
@@ -181,6 +188,7 @@ def get_task(task_id: Union[int, str]) -> Dict:
 
     raise ValueError("Task not found")
 
+# US006 - Mise à jour titre/description
 def update_task(task_id, title=None, description=None):
     try:
         tid = int(task_id)
@@ -202,6 +210,7 @@ def update_task(task_id, title=None, description=None):
             return task
     raise ValueError("Task not found")
 
+# US007 - Changement de statut
 def change_task_status(task_id, status):
     allowed = {"TODO", "ONGOING", "DONE"}
     if status not in allowed:
@@ -216,6 +225,7 @@ def change_task_status(task_id, status):
             return task
     raise ValueError("Task not found")
 
+# US008 - Suppression de tâche
 def delete_task(task_id):
     try:
         tid = int(task_id)
@@ -227,6 +237,7 @@ def delete_task(task_id):
             return
     raise ValueError("Task not found")
 
+# US009 - Recherche de tâches (keyword)
 def search_tasks(keyword, page=1, page_size=10, sort_by="created_at", order="desc"):
     """
     Recherche les tâches par mot-clé dans le titre ou la description.
@@ -240,6 +251,7 @@ def search_tasks(keyword, page=1, page_size=10, sort_by="created_at", order="des
         keyword=keyword
     )
 
+# US010 – Filtrage des tâches par statut (wrapper de get_tasks)
 def filter_tasks_by_status(status, page=1, page_size=10, sort_by="created_at", order="desc"):
     """
     Filtre les tâches par statut.
@@ -253,6 +265,7 @@ def filter_tasks_by_status(status, page=1, page_size=10, sort_by="created_at", o
         status=status
     )
 
+# US012 - Assignation de tâche à un utilisateur
 def assign_task(task_id: Union[int, str], user_id: Union[int, str, None]):
     try:
         tid = int(task_id)
@@ -296,6 +309,7 @@ def _save_users(users):
     except IOError:
         pass
 
+# US010 - Création d'un nouvel utilisateur
 def create_user(name: str, email: str) -> dict:
     name_stripped = name.strip()
     if not name_stripped:
@@ -325,6 +339,7 @@ def create_user(name: str, email: str) -> dict:
     _save_users(users)
     return user
 
+# US011 - Lister les utilisateurs
 def get_users(page=1, page_size=20, return_pagination=False):
     """
     Retourne la liste paginée et triée (par nom) des utilisateurs.
@@ -347,6 +362,7 @@ def get_users(page=1, page_size=20, return_pagination=False):
     else:
         return paged_users
 
+# US013 - Filtrer les tâches par utilisateur assigné
 def get_tasks_by_user(
     user_id=None,
     page=1,
@@ -415,7 +431,8 @@ def get_tasks_by_user(
         return paged_tasks, pagination
     else:
         return paged_tasks
-    
+
+# US014 – Définition (ou suppression) de la date d’échéance
 def set_due_date(task_id, due_date):
     try:
         tid = int(task_id)
@@ -437,6 +454,7 @@ def set_due_date(task_id, due_date):
             return task
     raise ValueError("Task not found")
 
+# US016 – Définition/maj de la priorité
 def set_task_priority(task_id, priority):
     allowed = {"LOW", "NORMAL", "HIGH", "CRITICAL"}
     prio = (priority or "NORMAL").upper()
@@ -452,6 +470,7 @@ def set_task_priority(task_id, priority):
             return task
     raise ValueError("Task not found")
 
+# US015 – Vérifier si une tâche est en retard
 def is_overdue(task):
     """
     Retourne True si la tâche est en retard :
@@ -481,13 +500,14 @@ def is_overdue(task):
         return True
     return False
 
+# US015 – Listing des tâches en retard
 def get_overdue_tasks():
     """
     Renvoie la liste des tâches en retard selon is_overdue().
     """
     return [t for t in task_list if is_overdue(t)]
 
-
+# US017 – Ajout d’un tag à une tâche
 def add_tag(task_id, tag):
     tag = tag.strip()
     if not tag or len(tag) > 20:
@@ -500,11 +520,13 @@ def add_tag(task_id, tag):
             return task
     raise ValueError("Task not found")
 
+# US017 – Ajout de plusieurs tags
 def add_tags(task_id, tags_list):
     for tag in tags_list:
         add_tag(task_id, tag)
     return get_task(task_id)
 
+# US017 – Suppression d’un tag
 def remove_tag(task_id, tag):
     for task in task_list:
         if task.get("id") == int(task_id):
@@ -514,13 +536,16 @@ def remove_tag(task_id, tag):
             return task
     raise ValueError("Task not found")
 
+# US017 – Recherche de tâches par un tag
 def get_tasks_by_tag(tag):
     return [t for t in task_list if tag in t.get("tags", [])]
 
+# US017 – Recherche de tâches par plusieurs tags
 def get_tasks_by_tags(tags):
     tags_set = set(tags)
     return [t for t in task_list if tags_set.intersection(set(t.get("tags", [])))]
 
+# US017 – Récupération de tous les tags avec leur fréquence
 def get_all_tags():
     tags = {}
     for t in task_list:
